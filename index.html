@@ -1,0 +1,1712 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Table to Calendar</title>
+<style>
+/* ---------- tokens ---------- */
+:root{
+  color-scheme: light;
+  --bg:#f5f6f8;
+  --surface:#ffffff;
+  --surface-2:#f1f3f6;
+  --border:#e0e4ea;
+  --border-strong:#c6ccd6;
+  --text:#171a1f;
+  --text-2:#5a6273;
+  --text-3:#878e9c;
+  --accent:#2f5fd0;
+  --accent-hover:#264dab;
+  --on-accent:#ffffff;
+  --accent-soft:#e9effc;
+  --ok:#0e7150; --ok-soft:#e2f4ec;
+  --warn:#8a5300; --warn-soft:#fbf0da;
+  --err:#a92a22; --err-soft:#fbe9e6;
+  --shadow:0 1px 2px rgba(16,24,40,.04), 0 2px 6px rgba(16,24,40,.05);
+  --r:10px;
+  --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,"Liberation Mono",monospace;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme: dark;
+    --bg:#111318;
+    --surface:#1a1d23;
+    --surface-2:#22262e;
+    --border:#2e333c;
+    --border-strong:#434a56;
+    --text:#e8eaee;
+    --text-2:#a5adbb;
+    --text-3:#79818f;
+    --accent:#6f9bf5;
+    --accent-hover:#8bafff;
+    --on-accent:#0e1420;
+    --accent-soft:#1e2a44;
+    --ok:#5fd3a4; --ok-soft:#15302a;
+    --warn:#e5b562; --warn-soft:#332a17;
+    --err:#f08a80; --err-soft:#37201e;
+    --shadow:0 1px 2px rgba(0,0,0,.3), 0 2px 8px rgba(0,0,0,.25);
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme: dark;
+  --bg:#111318;
+  --surface:#1a1d23;
+  --surface-2:#22262e;
+  --border:#2e333c;
+  --border-strong:#434a56;
+  --text:#e8eaee;
+  --text-2:#a5adbb;
+  --text-3:#79818f;
+  --accent:#6f9bf5;
+  --accent-hover:#8bafff;
+  --on-accent:#0e1420;
+  --accent-soft:#1e2a44;
+  --ok:#5fd3a4; --ok-soft:#15302a;
+  --warn:#e5b562; --warn-soft:#332a17;
+  --err:#f08a80; --err-soft:#37201e;
+  --shadow:0 1px 2px rgba(0,0,0,.3), 0 2px 8px rgba(0,0,0,.25);
+}
+
+/* ---------- reset ---------- */
+*,*::before,*::after{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:14px/1.5 var(--sans);-webkit-font-smoothing:antialiased}
+img{max-width:100%}
+[hidden]{display:none!important}
+h1,h2,h3,p{margin:0}
+button,input,select,textarea{font:inherit;color:inherit}
+
+/* ---------- shell ---------- */
+.wrap{max-width:1280px;margin:0 auto;padding:18px 18px 56px}
+header.top{display:flex;align-items:flex-start;gap:14px;flex-wrap:wrap;margin-bottom:18px}
+.brand{display:flex;gap:11px;align-items:center;min-width:0}
+.brand .mark{width:36px;height:36px;border-radius:9px;background:var(--accent);color:var(--on-accent);display:grid;place-items:center;font-size:18px;flex:none}
+h1{font-size:17px;font-weight:650;letter-spacing:-.01em}
+.tag{color:var(--text-2);font-size:12.5px;margin-top:1px}
+.top-actions{margin-left:auto;display:flex;gap:8px;align-items:center}
+
+.cols{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:18px;align-items:start}
+/* minmax(0,…) not 1fr: a bare 1fr floors at min-content and the wide preview
+   table would push the whole page sideways */
+@media (max-width:1000px){.cols{grid-template-columns:minmax(0,1fr)}}
+.cols>*{min-width:0}
+@media (min-width:1001px){.side{position:sticky;top:18px}}
+
+/* ---------- cards ---------- */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);box-shadow:var(--shadow);margin-bottom:14px;overflow:hidden}
+.card summary{list-style:none;cursor:pointer;padding:13px 15px;display:flex;align-items:center;gap:10px;user-select:none}
+.card summary::marker,.card summary::-webkit-details-marker{display:none;content:""}
+.card summary:hover{background:var(--surface-2)}
+.num{width:21px;height:21px;border-radius:6px;background:var(--surface-2);border:1px solid var(--border);color:var(--text-2);display:grid;place-items:center;font-size:11.5px;font-weight:650;flex:none}
+details[open]>summary .num{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.card summary h2{font-size:13.5px;font-weight:640}
+.sum-note{margin-left:auto;color:var(--text-3);font-size:12px;text-align:right;max-width:52%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chev{flex:none;color:var(--text-3);transition:transform .15s}
+details[open]>summary .chev{transform:rotate(90deg)}
+.body{padding:2px 15px 15px}
+
+/* ---------- form ---------- */
+.field{margin-top:12px}
+.field:first-child{margin-top:4px}
+label.lab{display:block;font-size:12px;font-weight:600;color:var(--text-2);margin-bottom:5px}
+.hint{font-size:11.5px;color:var(--text-3);margin-top:5px;line-height:1.45}
+input[type=text],input[type=number],input[type=time],input[type=date],input[type=email],select,textarea{
+  width:100%;padding:7px 9px;background:var(--surface);border:1px solid var(--border-strong);
+  border-radius:7px;outline:none;transition:border-color .12s, box-shadow .12s}
+textarea{resize:vertical;min-height:64px}
+input:focus,select:focus,textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+select{appearance:none;background-image:linear-gradient(45deg,transparent 50%,var(--text-3) 50%),linear-gradient(135deg,var(--text-3) 50%,transparent 50%);background-position:calc(100% - 15px) 52%,calc(100% - 10px) 52%;background-size:5px 5px,5px 5px;background-repeat:no-repeat;padding-right:30px}
+.row{display:flex;gap:9px}
+.row>*{flex:1;min-width:0}
+.row.tight{gap:7px}
+.grow2{flex:2}
+.check{display:flex;gap:8px;align-items:flex-start;cursor:pointer;font-size:13px;padding:2px 0}
+.check input{margin:2px 0 0;flex:none;accent-color:var(--accent);width:15px;height:15px}
+fieldset{border:0;padding:0;margin:0}
+
+/* ---------- buttons ---------- */
+button{cursor:pointer;border-radius:7px;border:1px solid var(--border-strong);background:var(--surface);padding:7px 12px;font-size:13px;font-weight:520;transition:background .12s,border-color .12s}
+button:hover{background:var(--surface-2);border-color:var(--text-3)}
+button:active{transform:translateY(.5px)}
+button.primary{background:var(--accent);border-color:var(--accent);color:var(--on-accent);font-weight:600}
+button.primary:hover{background:var(--accent-hover);border-color:var(--accent-hover)}
+button.primary:disabled{opacity:.45;cursor:not-allowed;background:var(--accent);border-color:var(--accent)}
+button.sm{padding:4px 9px;font-size:12px}
+button.icon{padding:6px 8px;line-height:1}
+.seg{display:inline-flex;border:1px solid var(--border-strong);border-radius:7px;overflow:hidden;background:var(--surface)}
+.seg button{border:0;border-radius:0;padding:5px 10px;font-size:12px;background:transparent}
+.seg button+button{border-left:1px solid var(--border)}
+.seg button[aria-pressed=true]{background:var(--accent);color:var(--on-accent);font-weight:600}
+
+/* ---------- paste / drop ---------- */
+.drop{border:1.5px dashed var(--border-strong);border-radius:9px;background:var(--surface-2);transition:border-color .12s,background .12s}
+.drop.over{border-color:var(--accent);background:var(--accent-soft)}
+.drop textarea{border:0;background:transparent;min-height:120px;font-family:var(--mono);font-size:12px;box-shadow:none}
+.drop textarea:focus{box-shadow:none}
+.dropbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:8px 9px;border-top:1px solid var(--border)}
+.dropbar .spacer{flex:1}
+
+/* ---------- chips ---------- */
+.chips{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px}
+.chip{font-family:var(--mono);font-size:11px;padding:3px 7px;border-radius:20px;background:var(--surface-2);border:1px solid var(--border);color:var(--text-2);cursor:pointer}
+.chip:hover{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
+
+/* ---------- preview ---------- */
+.stat{display:flex;gap:9px;align-items:baseline;padding:13px 15px;border-bottom:1px solid var(--border);flex-wrap:wrap}
+.stat b{font-size:23px;font-weight:660;letter-spacing:-.02em;line-height:1}
+.pill{font-size:11px;padding:3px 9px;border-radius:20px;background:var(--accent-soft);color:var(--accent);font-weight:640}
+.stat span{color:var(--text-2);font-size:12.5px}
+.tablewrap{overflow-x:auto;max-height:340px;overflow-y:auto}
+table{border-collapse:collapse;width:100%;font-size:12px}
+th,td{text-align:left;padding:6px 9px;border-bottom:1px solid var(--border);white-space:nowrap;vertical-align:top}
+th{position:sticky;top:0;background:var(--surface-2);color:var(--text-2);font-weight:620;font-size:11px;text-transform:uppercase;letter-spacing:.04em;z-index:1}
+td.wrap-cell{white-space:normal;min-width:150px;max-width:280px}
+tbody tr:last-child td{border-bottom:0}
+.mono{font-family:var(--mono);font-size:11.5px}
+.muted{color:var(--text-3)}
+
+.msg{margin:11px 15px;padding:9px 11px;border-radius:8px;font-size:12.5px;line-height:1.5}
+.msg.warn{background:var(--warn-soft);color:var(--warn)}
+.msg.err{background:var(--err-soft);color:var(--err)}
+.msg.info{background:var(--surface-2);color:var(--text-2)}
+.msg ul{margin:5px 0 0;padding-left:17px}
+.msg li{margin:1px 0}
+
+.actions{display:flex;gap:8px;padding:13px 15px;border-top:1px solid var(--border);flex-wrap:wrap;align-items:center}
+.actions .spacer{flex:1}
+pre.ics{margin:0;padding:12px 15px;background:var(--surface-2);border-top:1px solid var(--border);font-family:var(--mono);font-size:11px;line-height:1.5;max-height:300px;overflow:auto;white-space:pre;color:var(--text-2)}
+
+.empty{padding:40px 22px;text-align:center;color:var(--text-3)}
+.empty .big{font-size:30px;margin-bottom:8px;opacity:.55}
+
+footer.foot{margin-top:22px;text-align:center;color:var(--text-3);font-size:11.5px;line-height:1.7}
+kbd{font-family:var(--mono);font-size:11px;background:var(--surface-2);border:1px solid var(--border);border-bottom-width:2px;border-radius:4px;padding:1px 5px}
+</style>
+</head>
+<body>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+<div class="wrap">
+
+  <header class="top">
+    <div class="brand">
+      <div class="mark">🗓</div>
+      <div>
+        <h1 data-i18n="app.name">Table to Calendar</h1>
+        <div class="tag" data-i18n="app.tag">Turn a spreadsheet into an .ics calendar file — in your browser, nothing uploaded.</div>
+      </div>
+    </div>
+    <div class="top-actions">
+      <div class="seg" role="group">
+        <button type="button" id="langEn" aria-pressed="true">EN</button>
+        <button type="button" id="langNl" aria-pressed="false">NL</button>
+      </div>
+      <button type="button" class="icon" id="themeBtn" title="Theme">◐</button>
+    </div>
+  </header>
+
+  <div class="cols">
+
+    <!-- ================= LEFT: settings ================= -->
+    <div>
+
+      <!-- 1. table -->
+      <details class="card" open>
+        <summary><span class="chev">›</span><span class="num">1</span><h2 data-i18n="s1.title">Your table</h2><span class="sum-note" id="note1"></span></summary>
+        <div class="body">
+          <div class="drop" id="drop">
+            <textarea id="paste" spellcheck="false" data-i18n-ph="s1.ph" placeholder="Paste your table here (copy the cells straight from Excel, Google Sheets or Numbers) — or drop a .xlsx / .csv file on this box."></textarea>
+            <div class="dropbar">
+              <button type="button" class="sm" id="fileBtn" data-i18n="s1.choose">Choose file…</button>
+              <input type="file" id="file" accept=".xlsx,.xls,.xlsm,.csv,.tsv,.txt" hidden>
+              <button type="button" class="sm" id="exampleBtn" data-i18n="s1.example">Load example</button>
+              <span class="spacer"></span>
+              <button type="button" class="sm" id="clearBtn" data-i18n="s1.clear">Clear</button>
+            </div>
+          </div>
+
+          <div class="row" style="margin-top:12px">
+            <div class="field" style="margin-top:0" id="sheetWrap" hidden>
+              <label class="lab" for="sheet" data-i18n="s1.sheet">Sheet</label>
+              <select id="sheet"></select>
+            </div>
+            <div class="field" style="margin-top:0;max-width:150px">
+              <label class="lab" for="headerRow" data-i18n="s1.header">Header row</label>
+              <input type="number" id="headerRow" min="1" max="200" value="1">
+            </div>
+          </div>
+          <div class="hint" data-i18n="s1.hint">The header row holds your column names. Raise it if the sheet starts with a title or empty rows.</div>
+        </div>
+      </details>
+
+      <!-- 2. dates & times -->
+      <details class="card" open>
+        <summary><span class="chev">›</span><span class="num">2</span><h2 data-i18n="s2.title">Dates &amp; times</h2><span class="sum-note" id="note2"></span></summary>
+        <div class="body">
+          <div class="row">
+            <div class="field">
+              <label class="lab" for="dateCol" data-i18n="s2.datecol">Date column</label>
+              <select id="dateCol"></select>
+            </div>
+            <div class="field" style="max-width:190px">
+              <label class="lab" for="dateOrder" data-i18n="s2.order">Date order</label>
+              <select id="dateOrder">
+                <option value="auto" data-i18n="s2.order.auto">Detect automatically</option>
+                <option value="dmy" data-i18n="s2.order.dmy">Day first (25-08-2026)</option>
+                <option value="mdy" data-i18n="s2.order.mdy">Month first (08/25/2026)</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="field">
+            <label class="check"><input type="checkbox" id="allDay"><span data-i18n="s2.allday">All-day events (no start/end time)</span></label>
+          </div>
+
+          <div id="timeBlock">
+            <div class="row">
+              <div class="field">
+                <label class="lab" data-i18n="s2.start">Starts at</label>
+                <select id="startMode">
+                  <option value="fixed" data-i18n="s2.fixedtime">Same time every event</option>
+                  <option value="col" data-i18n="s2.fromcol">From a column</option>
+                </select>
+              </div>
+              <div class="field" style="max-width:190px">
+                <label class="lab">&nbsp;</label>
+                <input type="time" id="startTime" value="18:30">
+                <select id="startCol" hidden></select>
+              </div>
+            </div>
+            <div class="row">
+              <div class="field">
+                <label class="lab" data-i18n="s2.end">Ends</label>
+                <select id="endMode">
+                  <option value="dur" data-i18n="s2.duration">After a fixed duration</option>
+                  <option value="fixed" data-i18n="s2.fixedtime">Same time every event</option>
+                  <option value="col" data-i18n="s2.fromcol">From a column</option>
+                </select>
+              </div>
+              <div class="field" style="max-width:190px">
+                <label class="lab">&nbsp;</label>
+                <div id="durWrap" class="row tight">
+                  <input type="number" id="durMin" min="5" max="1440" step="5" value="180">
+                  <span style="flex:none;align-self:center;color:var(--text-2);font-size:12px" data-i18n="s2.minutes">min</span>
+                </div>
+                <input type="time" id="endTime" value="22:30" hidden>
+                <select id="endCol" hidden></select>
+              </div>
+            </div>
+          </div>
+
+          <div class="field">
+            <label class="lab" for="endDateCol" data-i18n="s2.enddate">End-date column (for multi-day events)</label>
+            <select id="endDateCol"></select>
+          </div>
+        </div>
+      </details>
+
+      <!-- 3. content -->
+      <details class="card" open>
+        <summary><span class="chev">›</span><span class="num">3</span><h2 data-i18n="s3.title">What each event says</h2><span class="sum-note" id="note3"></span></summary>
+        <div class="body">
+          <div class="hint" style="margin:6px 0 0" data-i18n="s3.hint">Type free text and click a column name to insert it. <code>{Host}</code> is replaced with that row's value.</div>
+
+          <div class="field">
+            <label class="lab" for="tplTitle" data-i18n="s3.titletpl">Title</label>
+            <input type="text" id="tplTitle" class="tpl" placeholder="Meeting at {Host}">
+          </div>
+          <div class="field">
+            <label class="lab" for="tplLoc" data-i18n="s3.loctpl">Location</label>
+            <input type="text" id="tplLoc" class="tpl" placeholder="{Location}">
+          </div>
+          <div class="field">
+            <label class="lab" for="tplDesc" data-i18n="s3.desctpl">Description</label>
+            <textarea id="tplDesc" class="tpl" placeholder="Host: {Host}&#10;Leader: {Leader}"></textarea>
+          </div>
+
+          <div class="chips" id="chips"></div>
+
+          <div class="field">
+            <label class="lab" for="addressBook" data-i18n="s3.book">Address book <span class="muted" data-i18n="s3.optional">(optional)</span></label>
+            <textarea id="addressBook" spellcheck="false" placeholder="John Doe = 1 Example Street, Springfield&#10;Jane Doe = 2 Sample Avenue, Springfield"></textarea>
+            <div class="hint" data-i18n="s3.bookhint">One <code>name = address</code> per line. When the location matches a name, the full address is used instead — handy when your table only lists who is hosting.</div>
+          </div>
+
+          <div class="field">
+            <label class="lab" for="skipCol" data-i18n="s3.skip">Skip rows where this column is empty</label>
+            <select id="skipCol"></select>
+          </div>
+        </div>
+      </details>
+
+      <!-- 4. repeat -->
+      <details class="card">
+        <summary><span class="chev">›</span><span class="num">4</span><h2 data-i18n="s4.title">Repeat</h2><span class="sum-note" id="note4"></span></summary>
+        <div class="body">
+          <div class="hint" style="margin:6px 0 0" data-i18n="s4.hint">Leave this off when your table already lists every single date. Switch it on when each row describes a series that repeats.</div>
+          <div class="field">
+            <label class="lab" for="freq" data-i18n="s4.every">Every row repeats</label>
+            <select id="freq">
+              <option value="none" data-i18n="s4.none">Not at all — one event per row</option>
+              <option value="DAILY" data-i18n="s4.daily">Daily</option>
+              <option value="WEEKLY" data-i18n="s4.weekly">Weekly</option>
+              <option value="WEEKLY2" data-i18n="s4.biweekly">Every 2 weeks</option>
+              <option value="MONTHLY" data-i18n="s4.monthly">Monthly (same date)</option>
+              <option value="MONTHLYNTH" data-i18n="s4.monthlynth">Monthly (same weekday, e.g. 2nd Tuesday)</option>
+              <option value="YEARLY" data-i18n="s4.yearly">Yearly</option>
+              <option value="CUSTOM" data-i18n="s4.custom">Custom interval…</option>
+            </select>
+          </div>
+
+          <div id="customWrap" hidden>
+            <div class="row">
+              <div class="field" style="max-width:120px">
+                <label class="lab" data-i18n="s4.intervaln">Every</label>
+                <input type="number" id="interval" min="1" max="999" value="1">
+              </div>
+              <div class="field">
+                <label class="lab">&nbsp;</label>
+                <select id="customUnit">
+                  <option value="DAILY" data-i18n="s4.u.days">days</option>
+                  <option value="WEEKLY" data-i18n="s4.u.weeks">weeks</option>
+                  <option value="MONTHLY" data-i18n="s4.u.months">months</option>
+                  <option value="YEARLY" data-i18n="s4.u.years">years</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div id="bydayWrap" hidden class="field">
+            <label class="lab" data-i18n="s4.ondays">On these days <span class="muted" data-i18n="s4.ondayshint">(leave empty to use each row's own weekday)</span></label>
+            <div class="chips" id="bydayChips"></div>
+          </div>
+
+          <div id="endWrap" hidden>
+            <div class="row">
+              <div class="field">
+                <label class="lab" data-i18n="s4.until">Stops</label>
+                <select id="endRule">
+                  <option value="count" data-i18n="s4.after">After a number of times</option>
+                  <option value="until" data-i18n="s4.ondate">On a date</option>
+                  <option value="never" data-i18n="s4.never">Never</option>
+                </select>
+              </div>
+              <div class="field" style="max-width:190px">
+                <label class="lab">&nbsp;</label>
+                <input type="number" id="count" min="1" max="999" value="10">
+                <input type="date" id="until" hidden>
+              </div>
+            </div>
+          </div>
+        </div>
+      </details>
+
+      <!-- 5. calendar options -->
+      <details class="card">
+        <summary><span class="chev">›</span><span class="num">5</span><h2 data-i18n="s5.title">Calendar options</h2><span class="sum-note" id="note5"></span></summary>
+        <div class="body">
+          <div class="field">
+            <label class="lab" for="calName" data-i18n="s5.name">Calendar name</label>
+            <input type="text" id="calName" value="My calendar">
+          </div>
+          <div class="field">
+            <label class="lab" for="tz" data-i18n="s5.tz">Time zone</label>
+            <select id="tz"></select>
+          </div>
+          <div class="row">
+            <div class="field">
+              <label class="lab" for="orgName" data-i18n="s5.orgname">Organiser name <span class="muted" data-i18n="s3.optional">(optional)</span></label>
+              <input type="text" id="orgName" placeholder="">
+            </div>
+            <div class="field">
+              <label class="lab" for="orgMail" data-i18n="s5.orgmail">Organiser e-mail</label>
+              <input type="email" id="orgMail" placeholder="">
+            </div>
+          </div>
+          <div class="row">
+            <div class="field">
+              <label class="lab" for="alarm" data-i18n="s5.reminder">Reminder</label>
+              <select id="alarm">
+                <option value="" data-i18n="s5.noreminder">None</option>
+                <option value="10">10 min</option>
+                <option value="30">30 min</option>
+                <option value="60">1 h</option>
+                <option value="120">2 h</option>
+                <option value="1440" data-i18n="s5.day">1 day</option>
+                <option value="10080" data-i18n="s5.week">1 week</option>
+              </select>
+            </div>
+            <div class="field">
+              <label class="lab" for="status" data-i18n="s5.status">Status</label>
+              <select id="status">
+                <option value="CONFIRMED" data-i18n="s5.confirmed">Confirmed</option>
+                <option value="TENTATIVE" data-i18n="s5.tentative">Tentative</option>
+              </select>
+            </div>
+          </div>
+          <div class="field">
+            <label class="check"><input type="checkbox" id="busy" checked><span data-i18n="s5.busy">Show me as busy during these events</span></label>
+          </div>
+          <div class="field">
+            <label class="lab" for="fname" data-i18n="s5.file">File name</label>
+            <input type="text" id="fname" value="calendar.ics">
+          </div>
+        </div>
+      </details>
+
+      <div class="card">
+        <div class="body" style="padding:13px 15px">
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <button type="button" class="sm" id="cfgSave" data-i18n="cfg.save">Save setup</button>
+            <button type="button" class="sm" id="cfgLoad" data-i18n="cfg.load">Load setup…</button>
+            <input type="file" id="cfgFile" accept=".json,application/json" hidden>
+            <span id="cfgMsg" class="hint" style="margin:0"></span>
+          </div>
+          <div class="hint" data-i18n="cfg.hint">Saves every dial on this page — column mapping, templates, address book, times, repeat and calendar options — as a small <code>.json</code> file. Load it next year, on another computer, or hand it to someone else to give them the same setup. You can also drop the file onto the box in step 1.</div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ================= RIGHT: preview ================= -->
+    <div class="side">
+      <div class="card" style="margin-bottom:14px">
+        <div class="stat">
+          <b id="count-n">0</b>
+          <span id="count-label" data-i18n="p.events">events</span>
+          <span class="pill" id="repeatBadge" hidden></span>
+          <span class="spacer" style="flex:1"></span>
+          <span class="muted mono" id="rangeLabel"></span>
+        </div>
+
+        <div id="messages"></div>
+
+        <div id="previewEmpty" class="empty">
+          <div class="big">📋</div>
+          <div data-i18n="p.empty">Paste a table on the left and your events appear here.</div>
+        </div>
+
+        <div class="tablewrap" id="previewWrap" hidden>
+          <table>
+            <thead><tr>
+              <th data-i18n="p.when">When</th>
+              <th data-i18n="p.title">Title</th>
+              <th data-i18n="p.where">Where</th>
+            </tr></thead>
+            <tbody id="previewBody"></tbody>
+          </table>
+        </div>
+
+        <div class="actions">
+          <button type="button" class="primary" id="download" disabled data-i18n="p.download">Download .ics</button>
+          <button type="button" id="copy" disabled data-i18n="p.copy">Copy</button>
+          <span class="spacer"></span>
+          <button type="button" class="sm" id="toggleRaw" disabled data-i18n="p.showraw">Show file</button>
+          <span class="hint" id="sandboxNote" hidden style="flex-basis:100%;margin:0" data-i18n="p.sandbox">This preview cannot hand over <code>.ics</code> files. Use <b>Copy</b> and paste into a file named <code>calendar.ics</code> — or host this page yourself, where the download button works normally. (Saving your setup below does work here.)</span>
+        </div>
+        <pre class="ics" id="raw" hidden></pre>
+      </div>
+
+      <div class="card">
+        <details>
+          <summary style="padding:11px 15px"><span class="chev">›</span><h2 data-i18n="p.howto">How do I get this into my calendar?</h2></summary>
+          <div class="body" style="font-size:12.5px;color:var(--text-2);line-height:1.65">
+            <p data-i18n="p.howto.g"><b>Google Calendar</b> — Settings → Import &amp; export → Import, pick the file and the target calendar.</p>
+            <p style="margin-top:8px" data-i18n="p.howto.o"><b>Outlook</b> — File → Open &amp; Export → Import/Export → Import an iCalendar (.ics) file. Choose <i>Import</i> to merge it into your calendar.</p>
+            <p style="margin-top:8px" data-i18n="p.howto.a"><b>Apple Calendar</b> — File → Import, or just double-click the downloaded file.</p>
+            <p style="margin-top:8px" data-i18n="p.howto.tip">Re-running this tool on an updated table produces the same event IDs, so importing again updates the events instead of duplicating them — as long as the calendar name stays the same.</p>
+          </div>
+        </details>
+      </div>
+    </div>
+  </div>
+
+  <footer class="foot">
+    <div data-i18n="foot.privacy">Everything happens locally in your browser. Your table is never uploaded anywhere.</div>
+    <div style="margin-top:3px" data-i18n="foot.save">Your settings are remembered on this device.</div>
+  </footer>
+</div>
+
+<script>
+"use strict";
+/* =====================================================================
+   Table to Calendar — a single-file, dependency-light .ics generator.
+   Reads a pasted/dropped table, maps columns onto event fields and
+   serialises RFC 5545 VEVENTs (with a generated VTIMEZONE so recurring
+   events survive daylight-saving changes).
+   ===================================================================== */
+
+const $  = (s, r) => (r || document).querySelector(s);
+const $$ = (s, r) => Array.from((r || document).querySelectorAll(s));
+
+/* ---------------------------------------------------------------- i18n */
+const NL = {
+  'app.name':'Tabel naar agenda',
+  'app.tag':'Maak van een spreadsheet een .ics-agendabestand — in je browser, niets wordt geüpload.',
+  's1.title':'Je tabel',
+  's1.ph':'Plak hier je tabel (kopieer de cellen rechtstreeks uit Excel, Google Sheets of Numbers) — of sleep een .xlsx- of .csv-bestand op dit vak.',
+  's1.choose':'Bestand kiezen…','s1.example':'Voorbeeld laden','s1.clear':'Wissen',
+  's1.sheet':'Tabblad','s1.header':'Kopregel',
+  's1.hint':'De kopregel bevat je kolomnamen. Verhoog dit als het blad begint met een titel of lege regels.',
+  's2.title':'Datums en tijden','s2.datecol':'Datumkolom','s2.order':'Datumvolgorde',
+  's2.order.auto':'Automatisch herkennen','s2.order.dmy':'Dag eerst (25-08-2026)','s2.order.mdy':'Maand eerst (08/25/2026)',
+  's2.allday':'Hele dag (geen begin- en eindtijd)',
+  's2.start':'Begint om','s2.end':'Eindigt','s2.fixedtime':'Elke keer dezelfde tijd','s2.fromcol':'Uit een kolom',
+  's2.duration':'Na een vaste duur','s2.minutes':'min','s2.enddate':'Einddatumkolom (voor meerdaagse afspraken)',
+  's3.title':'Wat er in de afspraak staat',
+  's3.hint':'Typ vrije tekst en klik op een kolomnaam om die in te voegen. <code>{Loca}</code> wordt vervangen door de waarde van die rij.',
+  's3.titletpl':'Titel','s3.loctpl':'Locatie','s3.desctpl':'Omschrijving',
+  's3.book':'Adresboek','s3.optional':'(optioneel)',
+  's3.bookhint':'Eén <code>naam = adres</code> per regel. Als de locatie overeenkomt met een naam, wordt het volledige adres gebruikt — handig als je tabel alleen vermeldt wie er gastheer is.',
+  's3.skip':'Sla rijen over waar deze kolom leeg is',
+  's4.title':'Herhaling',
+  's4.hint':'Laat dit uit staan als je tabel elke datum al apart noemt. Zet het aan als elke rij een terugkerende reeks beschrijft.',
+  's4.every':'Elke rij herhaalt','s4.none':'Niet — één afspraak per rij','s4.daily':'Dagelijks','s4.weekly':'Wekelijks',
+  's4.biweekly':'Om de 2 weken','s4.monthly':'Maandelijks (zelfde datum)','s4.monthlynth':'Maandelijks (zelfde weekdag, bv. 2e dinsdag)',
+  's4.yearly':'Jaarlijks','s4.custom':'Eigen interval…','s4.intervaln':'Elke',
+  's4.u.days':'dagen','s4.u.weeks':'weken','s4.u.months':'maanden','s4.u.years':'jaren',
+  's4.ondays':'Op deze dagen','s4.ondayshint':'(leeg laten = de eigen weekdag van elke rij)',
+  's4.until':'Stopt','s4.after':'Na een aantal keer','s4.ondate':'Op een datum','s4.never':'Nooit',
+  's5.title':'Agenda-instellingen','s5.name':'Naam van de agenda','s5.tz':'Tijdzone',
+  's5.orgname':'Naam organisator','s5.orgmail':'E-mail organisator',
+  's5.reminder':'Herinnering','s5.noreminder':'Geen','s5.day':'1 dag','s5.week':'1 week',
+  's5.status':'Status','s5.confirmed':'Bevestigd','s5.tentative':'Onder voorbehoud',
+  's5.busy':'Toon mij als bezet tijdens deze afspraken','s5.file':'Bestandsnaam',
+  'p.events':'afspraken','p.empty':'Plak links een tabel en je afspraken verschijnen hier.',
+  'p.when':'Wanneer','p.title':'Titel','p.where':'Waar',
+  'p.download':'.ics downloaden','p.copy':'Kopiëren','p.showraw':'Bestand tonen','p.hideraw':'Bestand verbergen',
+  'p.howto':'Hoe krijg ik dit in mijn agenda?',
+  'p.howto.g':'<b>Google Agenda</b> — Instellingen → Importeren en exporteren → Importeren, kies het bestand en de doelagenda.',
+  'p.howto.o':'<b>Outlook</b> — Bestand → Openen en exporteren → Importeren/exporteren → Een iCalendar-bestand (.ics) importeren. Kies <i>Importeren</i> om het samen te voegen met je agenda.',
+  'p.howto.a':'<b>Apple Agenda</b> — Archief → Importeer, of dubbelklik gewoon op het gedownloade bestand.',
+  'p.howto.tip':'Als je deze tool opnieuw draait op een bijgewerkte tabel, krijgen de afspraken dezelfde ID\u2019s. Opnieuw importeren werkt ze dan bij in plaats van ze te verdubbelen — zolang de naam van de agenda gelijk blijft.',
+  'cfg.save':'Instellingen opslaan','cfg.load':'Instellingen laden…',
+  'cfg.hint':'Slaat alle instellingen op deze pagina op — kolomkoppeling, sjablonen, adresboek, tijden, herhaling en agenda-opties — als een klein <code>.json</code>-bestand. Laad het volgend jaar, op een andere computer, of geef het aan iemand anders zodat die dezelfde opzet heeft. Je kunt het bestand ook op het vak in stap 1 slepen.',
+  'm.cfgsaved':'Opgeslagen','m.cfgloaded':'Instellingen geladen','m.cfgbad':'Geen geldig instellingenbestand',
+  'p.sandbox':'Deze preview kan geen <code>.ics</code>-bestanden doorgeven. Gebruik <b>Kopiëren</b> en plak in een bestand met de naam <code>agenda.ics</code> — of host deze pagina zelf, dan werkt de downloadknop gewoon. (Je instellingen opslaan werkt hier wél.)',
+  'foot.privacy':'Alles gebeurt lokaal in je browser. Je tabel wordt nergens naartoe gestuurd.',
+  'foot.save':'Je instellingen worden op dit apparaat onthouden.',
+  'm.noxlsx':'Excel-bestanden kunnen nu niet gelezen worden (de leesbibliotheek kon niet laden). Sla je blad op als .csv of plak de cellen rechtstreeks.',
+  'm.badfile':'Dit bestand kon niet gelezen worden.',
+  'm.nocols':'Geen kolommen gevonden. Klopt de kopregel?',
+  'm.nodate':'Kies een datumkolom.',
+  'm.skipped':'rij(en) overgeslagen — geen leesbare datum:',
+  'm.copied':'Gekopieerd!',
+  'p.row':'rij', 'p.rows':'rijen', 'p.none':'\u2014 geen \u2014', 'm.cols':'kolommen'
+};
+// Keys used only at runtime have no element to read English from.
+const EN_EXTRA = {
+  'p.row':'row', 'p.rows':'rows', 'p.none':'\u2014 none \u2014',
+  'p.hideraw':'Hide file', 'm.copied':'Copied!',
+  'm.skipped':'row(s) skipped \u2014 no readable date:',
+  'm.nodate':'Pick a date column.',
+  'm.nocols':'No columns found \u2014 is the header row right?',
+  'm.noxlsx':'Excel files cannot be read right now (the reader failed to load). Save your sheet as .csv, or paste the cells directly.',
+  'm.badfile':'That file could not be read.',
+  'm.cols':'columns',
+  'm.cfgsaved':'Saved', 'm.cfgloaded':'Settings loaded', 'm.cfgbad':'Not a valid settings file'
+};
+let EN = null, lang = 'en';
+
+function captureEN(){
+  EN = Object.assign({}, EN_EXTRA);
+  $$('[data-i18n]').forEach(el => { EN[el.dataset.i18n] = el.innerHTML; });
+  $$('[data-i18n-ph]').forEach(el => { EN['ph:' + el.dataset.i18nPh] = el.placeholder; });
+}
+function t(key){
+  if (lang === 'nl' && NL[key] != null) return NL[key];
+  if (EN && EN[key] != null) return EN[key];
+  return key;
+}
+function applyLang(){
+  $$('[data-i18n]').forEach(el => { el.innerHTML = t(el.dataset.i18n); });
+  $$('[data-i18n-ph]').forEach(el => { el.placeholder = lang === 'nl' && NL[el.dataset.i18nPh] ? NL[el.dataset.i18nPh] : EN['ph:' + el.dataset.i18nPh]; });
+  $('#langEn').setAttribute('aria-pressed', String(lang === 'en'));
+  $('#langNl').setAttribute('aria-pressed', String(lang === 'nl'));
+  document.documentElement.lang = lang;
+  // this button's label depends on state, not just on its data-i18n default
+  $('#toggleRaw').textContent = $('#raw').hidden ? t('p.showraw') : t('p.hideraw');
+  render();
+}
+
+/* ------------------------------------------------------------ storage */
+function save(k, v){ try { localStorage.setItem('t2c.' + k, v); } catch (e) {} }
+function load(k, d){ try { const v = localStorage.getItem('t2c.' + k); return v === null ? d : v; } catch (e) { return d; } }
+
+/* ------------------------------------------------------- delimited text */
+function parseDelimited(text, delim){
+  const rows = []; let row = [], field = '', inQ = false, i = 0;
+  text = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  while (i < text.length){
+    const ch = text[i];
+    if (inQ){
+      if (ch === '"'){
+        if (text[i + 1] === '"'){ field += '"'; i += 2; continue; }
+        inQ = false; i++; continue;
+      }
+      field += ch; i++; continue;
+    }
+    if (ch === '"' && field === ''){ inQ = true; i++; continue; }
+    if (ch === delim){ row.push(field); field = ''; i++; continue; }
+    if (ch === '\n'){ row.push(field); rows.push(row); row = []; field = ''; i++; continue; }
+    field += ch; i++;
+  }
+  row.push(field); rows.push(row);
+  return rows;
+}
+function detectDelim(text){
+  const lines = text.replace(/\r\n/g, '\n').split('\n').filter(l => l.trim() !== '').slice(0, 12);
+  if (!lines.length) return '\t';
+  let best = ',', bestScore = -1;
+  for (const d of ['\t', ';', ',', '|']){
+    const counts = lines.map(l => parseDelimited(l, d)[0].length);
+    const max = Math.max.apply(null, counts);
+    if (max < 2) continue;
+    const consistent = counts.filter(c => c === counts[0]).length / counts.length;
+    const score = consistent * 20 + Math.min(max, 12);
+    if (score > bestScore){ bestScore = score; best = d; }
+  }
+  return best;
+}
+
+/* ------------------------------------------------------------- excel */
+// Excel stores dates as day counts. Converting via UTC keeps the result free
+// of the reader's own time zone, which is the usual source of off-by-one days.
+function serialToText(n, date1904){
+  if (date1904) n += 1462;
+  const pad = x => String(x).padStart(2, '0');
+  if (n > 0 && n < 1){                       // time-only cell
+    let s = Math.round(n * 86400);
+    return pad(Math.floor(s / 3600) % 24) + ':' + pad(Math.floor(s / 60) % 60) + ':' + pad(s % 60);
+  }
+  const d = new Date(Date.UTC(1899, 11, 30) + Math.round(n * 86400000));
+  if (isNaN(d.getTime())) return String(n);
+  const day = d.getUTCFullYear() + '-' + pad(d.getUTCMonth() + 1) + '-' + pad(d.getUTCDate());
+  const hasTime = Math.abs(n - Math.floor(n)) > 1e-9;
+  return hasTime ? day + 'T' + pad(d.getUTCHours()) + ':' + pad(d.getUTCMinutes()) + ':' + pad(d.getUTCSeconds()) : day;
+}
+// A number format is a date format when it mentions y/m/d/h/s outside quotes.
+function isDateFmt(z){
+  if (!z || typeof z !== 'string') return false;
+  const stripped = z.replace(/"[^"]*"/g, '').replace(/\\./g, '').replace(/\[[^\]]*\]/g, '');
+  return /[ymdhs]/i.test(stripped);
+}
+function sheetToGrid(ws, date1904){
+  if (!ws || !ws['!ref']) return [];
+  const range = XLSX.utils.decode_range(ws['!ref']);
+  const grid = [];
+  // Start at row/column 0 even when the used range does not, so a grid index
+  // still lines up with the row number the user sees in Excel.
+  for (let R = 0; R <= range.e.r; R++){
+    const row = [];
+    for (let C = 0; C <= range.e.c; C++){
+      const cell = ws[XLSX.utils.encode_cell({ r: R, c: C })];
+      if (!cell){ row.push(''); continue; }
+      if (cell.t === 'n' && isDateFmt(cell.z)) row.push(serialToText(cell.v, date1904));
+      else if (cell.t === 'd' && cell.v instanceof Date) row.push(cell.v.toISOString().slice(0, 19));
+      else if (cell.w != null) row.push(String(cell.w));
+      else row.push(cell.v == null ? '' : String(cell.v));
+    }
+    grid.push(row);
+  }
+  return grid;
+}
+
+/* -------------------------------------------------------- date parsing */
+const MONTHS = {
+  jan:1, januari:1, january:1, feb:2, februari:2, february:2, mrt:3, maa:3, maart:3, mar:3, march:3,
+  apr:4, april:4, mei:5, may:5, jun:6, juni:6, june:6, jul:7, juli:7, july:7,
+  aug:8, augustus:8, august:8, sep:9, sept:9, september:9, okt:10, oct:10, oktober:10, october:10,
+  nov:11, november:11, dec:12, december:12
+};
+const WEEKDAY_RE = /^(ma|di|wo|do|vr|za|zo|maandag|dinsdag|woensdag|donderdag|vrijdag|zaterdag|zondag|mon|tue|tues|wed|thu|thur|thurs|fri|sat|sun|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b[.,]?\s*/i;
+
+function monthFromName(s){
+  const k = String(s).toLowerCase().replace(/\.$/, '');
+  return MONTHS[k] || MONTHS[k.slice(0, 3)] || 0;
+}
+function fixYear(y){ return y < 100 ? (y < 70 ? 2000 + y : 1900 + y) : y; }
+function mkDate(y, m, d, time){
+  if (!(m >= 1 && m <= 12) || !(d >= 1 && d <= 31) || !(y >= 1900 && y <= 2200)) return null;
+  const probe = new Date(Date.UTC(y, m - 1, d));
+  if (probe.getUTCMonth() !== m - 1 || probe.getUTCDate() !== d) return null;   // e.g. 31 February
+  return { y: y, m: m, d: d, time: time || null };
+}
+
+function parseDateCell(raw, order){
+  if (raw == null) return null;
+  let s = String(raw).trim();
+  if (!s) return null;
+  s = s.replace(WEEKDAY_RE, '').trim();
+  s = s.replace(/^\w+dag\b[.,]?\s*/i, '').trim();
+
+  let time = null;
+  const tm = s.match(/[\sT](\d{1,2})[:.](\d{2})(?:[:.](\d{2}))?\s*$/);
+  if (tm){ time = { H: +tm[1], M: +tm[2] }; s = s.slice(0, tm.index).trim(); }
+
+  let m;
+  if ((m = s.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})$/)))
+    return mkDate(+m[1], +m[2], +m[3], time);
+
+  if ((m = s.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{2,4})$/))){
+    const a = +m[1], b = +m[2], y = fixYear(+m[3]);
+    let day, mon;
+    if (a > 12){ day = a; mon = b; }
+    else if (b > 12){ mon = a; day = b; }
+    else if (order === 'mdy'){ mon = a; day = b; }
+    else { day = a; mon = b; }
+    return mkDate(y, mon, day, time);
+  }
+  if ((m = s.match(/^(\d{1,2})[-.\s]+([A-Za-z]+)\.?[-.\s]+(\d{2,4})$/))){
+    const mon = monthFromName(m[2]);
+    if (mon) return mkDate(fixYear(+m[3]), mon, +m[1], time);
+  }
+  if ((m = s.match(/^([A-Za-z]+)\.?[-.\s]+(\d{1,2}),?[-.\s]+(\d{2,4})$/))){
+    const mon = monthFromName(m[1]);
+    if (mon) return mkDate(fixYear(+m[3]), mon, +m[2], time);
+  }
+  if (/^\d{5}(\.\d+)?$/.test(s))                       // bare Excel serial
+    return parseDateCell(serialToText(parseFloat(s), false), order);
+  if ((m = s.match(/^(\d{4})(\d{2})(\d{2})$/)))
+    return mkDate(+m[1], +m[2], +m[3], time);
+  return null;
+}
+
+// Scan the column: a first component above 12 anywhere proves day-first.
+function detectOrder(values){
+  let dmy = 0, mdy = 0;
+  for (const v of values){
+    const m = String(v == null ? '' : v).trim().match(/^(\d{1,2})[-/.](\d{1,2})[-/.]\d{2,4}/);
+    if (!m) continue;
+    if (+m[1] > 12) dmy++;
+    else if (+m[2] > 12) mdy++;
+  }
+  if (dmy && !mdy) return 'dmy';
+  if (mdy && !dmy) return 'mdy';
+  return 'dmy';                                        // NL/EU default
+}
+
+function parseTimeCell(raw){
+  if (raw == null) return null;
+  let s = String(raw).trim().toLowerCase();
+  if (!s) return null;
+  if (/^0?\.\d+$/.test(s)){                            // Excel time fraction
+    const mins = Math.round(parseFloat(s) * 1440);
+    return { H: Math.floor(mins / 60) % 24, M: mins % 60 };
+  }
+  let pm = false, am = false;
+  if (/\bp\.?m\.?$/.test(s)){ pm = true; s = s.replace(/\s*p\.?m\.?$/, '').trim(); }
+  if (/\ba\.?m\.?$/.test(s)){ am = true; s = s.replace(/\s*a\.?m\.?$/, '').trim(); }
+  s = s.replace(/\s*uur$/, '').replace(/[uh]$/, '').trim();
+  const fix = H => { if (pm && H < 12) H += 12; if (am && H === 12) H = 0; return H; };
+  let m;
+  if ((m = s.match(/^(\d{1,2})[:.h](\d{1,2})(?:[:.](\d{1,2}))?$/))){
+    const H = fix(+m[1]), M = +m[2];
+    if (H <= 23 && M <= 59) return { H: H, M: M };
+  }
+  if ((m = s.match(/^(\d{1,2})$/))){
+    const H = fix(+m[1]);
+    if (H <= 23) return { H: H, M: 0 };
+  }
+  if ((m = s.match(/^(\d{3,4})$/))){
+    const H = Math.floor(+m[1] / 100), M = +m[1] % 100;
+    if (H <= 23 && M <= 59) return { H: H, M: M };
+  }
+  return null;
+}
+
+/* --------------------------------------------------------- time zones */
+const dtfCache = new Map(), tzCache = new Map();
+function getDTF(tz){
+  if (!dtfCache.has(tz)){
+    dtfCache.set(tz, new Intl.DateTimeFormat('en-US', {
+      timeZone: tz, hour12: false,
+      year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', second: '2-digit'
+    }));
+  }
+  return dtfCache.get(tz);
+}
+// Minutes east of UTC for the given instant.
+function tzOffset(tz, ms){
+  const parts = getDTF(tz).formatToParts(new Date(ms));
+  const o = {};
+  for (const p of parts) if (p.type !== 'literal') o[p.type] = p.value;
+  let h = +o.hour; if (h === 24) h = 0;
+  // Round: the formatter truncates to whole seconds, so an instant carrying
+  // milliseconds would otherwise yield a fractional (never-equal) offset.
+  return Math.round((Date.UTC(+o.year, +o.month - 1, +o.day, h, +o.minute, +o.second) - ms) / 60000);
+}
+// Wall-clock time in `tz` -> the UTC instant it denotes.
+function zonedToUTC(y, mo, d, H, M, tz){
+  const naive = Date.UTC(y, mo - 1, d, H, M, 0);
+  let ms = naive - tzOffset(tz, naive) * 60000;
+  ms = naive - tzOffset(tz, ms) * 60000;               // one refinement handles DST edges
+  return ms;
+}
+function offStr(min){
+  const sign = min < 0 ? '-' : '+', a = Math.abs(min);
+  return sign + String(Math.floor(a / 60)).padStart(2, '0') + String(a % 60).padStart(2, '0');
+}
+// Sample the zone and bisect wherever the offset moves; ~10-day steps are far
+// finer than any real transition spacing.
+function tzTransitions(tz, y0, y1){
+  const key = tz + '|' + y0 + '|' + y1;
+  if (tzCache.has(key)) return tzCache.get(key);
+  const out = [], STEP = 10 * 86400000, end = Date.UTC(y1, 0, 1);
+  let t = Date.UTC(y0, 0, 1), prev = tzOffset(tz, t);
+  const first = prev;
+  while (t < end){
+    const next = Math.min(t + STEP, end);
+    const off = tzOffset(tz, next);
+    if (off !== prev){
+      let lo = t, hi = next;
+      while (hi - lo > 60000){
+        const mid = lo + Math.floor((hi - lo) / 2);
+        if (tzOffset(tz, mid) === prev) lo = mid; else hi = mid;
+      }
+      out.push({ at: hi, from: prev, to: off });
+      prev = off;
+    }
+    t = next;
+  }
+  const res = { first: first, list: out };
+  tzCache.set(key, res);
+  return res;
+}
+function buildVTimezone(tz, y0, y1){
+  const pad = x => String(x).padStart(2, '0');
+  const L = ['BEGIN:VTIMEZONE', 'TZID:' + tz, 'X-LIC-LOCATION:' + tz];
+  const tr = tzTransitions(tz, y0, y1);
+  const base = offStr(tr.first);
+  L.push('BEGIN:STANDARD', 'DTSTART:19700101T000000',
+         'TZOFFSETFROM:' + base, 'TZOFFSETTO:' + base, 'TZNAME:' + base, 'END:STANDARD');
+  for (const x of tr.list){
+    const local = new Date(x.at + x.from * 60000);
+    const kind = x.to > x.from ? 'DAYLIGHT' : 'STANDARD';
+    L.push('BEGIN:' + kind,
+      'DTSTART:' + local.getUTCFullYear() + pad(local.getUTCMonth() + 1) + pad(local.getUTCDate()) +
+        'T' + pad(local.getUTCHours()) + pad(local.getUTCMinutes()) + '00',
+      'TZOFFSETFROM:' + offStr(x.from),
+      'TZOFFSETTO:' + offStr(x.to),
+      'TZNAME:' + offStr(x.to),
+      'END:' + kind);
+  }
+  L.push('END:VTIMEZONE');
+  return L;
+}
+
+/* ------------------------------------------------------ ics primitives */
+function esc(s){
+  return String(s == null ? '' : s)
+    .replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,')
+    .replace(/\r\n|\r|\n/g, '\\n');
+}
+const enc = new TextEncoder();
+function fold(line){
+  if (enc.encode(line).length <= 75) return line;
+  const out = []; let cur = '', bytes = 0;
+  for (const ch of line){
+    const b = enc.encode(ch).length;
+    if (bytes + b > 75){ out.push(cur); cur = ' '; bytes = 1; }
+    cur += ch; bytes += b;
+  }
+  out.push(cur);
+  return out.join('\r\n');
+}
+function fnv(str){
+  let h = 0x811c9dc5;
+  for (let i = 0; i < str.length; i++){
+    h ^= str.charCodeAt(i);
+    h = (h + ((h << 1) + (h << 4) + (h << 7) + (h << 8) + (h << 24))) >>> 0;
+  }
+  return h.toString(16).padStart(8, '0');
+}
+function stampUTC(ms){
+  const d = new Date(ms), p = x => String(x).padStart(2, '0');
+  return d.getUTCFullYear() + p(d.getUTCMonth() + 1) + p(d.getUTCDate()) + 'T' +
+         p(d.getUTCHours()) + p(d.getUTCMinutes()) + p(d.getUTCSeconds()) + 'Z';
+}
+function localStr(y, m, d, H, M){
+  const p = x => String(x).padStart(2, '0');
+  return y + p(m) + p(d) + 'T' + p(H) + p(M) + '00';
+}
+function dateStr(y, m, d){
+  const p = x => String(x).padStart(2, '0');
+  return y + p(m) + p(d);
+}
+function addDays(y, m, d, n){
+  const x = new Date(Date.UTC(y, m - 1, d + n));
+  return { y: x.getUTCFullYear(), m: x.getUTCMonth() + 1, d: x.getUTCDate() };
+}
+
+/* --------------------------------------------------- header detection */
+// A header row is the first line that holds several cells of plain text and
+// no date — that skips the title and spacer rows spreadsheets often start with.
+function autoHeaderRow(grid){
+  const limit = Math.min(grid.length, 25);
+  for (let r = 0; r < limit; r++){
+    const filled = (grid[r] || []).map(c => String(c == null ? '' : c).trim()).filter(c => c !== '');
+    if (filled.length < 2) continue;
+    if (filled.some(c => parseDateCell(c, 'dmy'))) continue;
+    const texty = filled.filter(c => !/^-?[\d.,%\s]+$/.test(c)).length;
+    if (texty >= Math.ceil(filled.length / 2)) return r + 1;
+  }
+  return 1;
+}
+
+/* ------------------------------------------------------------- state */
+const state = { sheets: [], grid: [], headers: [], data: [], source: '', wanted: null };
+
+/* ------------------------------------------------------------ loading */
+function setGrid(grid, autoHeader){
+  grid = grid || [];
+  const hasContent = grid.some(r => r.some(c => String(c == null ? '' : c).trim() !== ''));
+  state.grid = hasContent ? grid : [];
+  if (autoHeader && hasContent) $('#headerRow').value = String(autoHeaderRow(state.grid));
+  rebuildColumns();
+}
+function rebuildColumns(){
+  const hr = Math.max(1, parseInt($('#headerRow').value, 10) || 1) - 1;
+  const grid = state.grid;
+  if (!grid.length || hr >= grid.length){ state.headers = []; state.data = []; refreshSelects(); render(); return; }
+
+  const width = grid.reduce((w, r) => Math.max(w, r.length), 0);
+  const seen = {};
+  state.headers = [];
+  for (let c = 0; c < width; c++){
+    let name = String(grid[hr][c] == null ? '' : grid[hr][c]).trim();
+    if (!name || /^Unnamed/i.test(name)) name = 'Column ' + (c + 1);
+    if (seen[name]){ seen[name]++; name = name + ' (' + seen[name] + ')'; } else seen[name] = 1;
+    state.headers.push(name);
+  }
+  state.data = [];
+  for (let r = hr + 1; r < grid.length; r++){
+    const obj = {};
+    let any = false;
+    for (let c = 0; c < width; c++){
+      const v = grid[r][c] == null ? '' : String(grid[r][c]).trim();
+      obj[state.headers[c]] = v;
+      if (v) any = true;
+    }
+    if (any) state.data.push(obj);
+  }
+  refreshSelects();
+  render();
+}
+
+function guess(patterns, fallback){
+  for (const p of patterns){
+    const hit = state.headers.find(h => p.test(h));
+    if (hit) return hit;
+  }
+  return fallback === undefined ? '' : fallback;
+}
+function fillSelect(sel, opts, keepValue, noneLabel){
+  const prev = keepValue ? sel.value : null;
+  sel.innerHTML = '';
+  if (noneLabel){
+    const o = document.createElement('option');
+    o.value = ''; o.textContent = noneLabel;
+    sel.appendChild(o);
+  }
+  for (const h of opts){
+    const o = document.createElement('option');
+    o.value = h; o.textContent = h;
+    sel.appendChild(o);
+  }
+  if (prev !== null && opts.indexOf(prev) >= 0) sel.value = prev;
+  return sel.value;
+}
+
+let mappedOnce = false;
+function refreshSelects(){
+  const H = state.headers;
+  const none = t('p.none');
+  fillSelect($('#dateCol'),    H, true);
+  fillSelect($('#endDateCol'), H, true, none);
+  fillSelect($('#startCol'),   H, true, none);
+  fillSelect($('#endCol'),     H, true, none);
+  fillSelect($('#skipCol'),    H, true, none);
+
+  // A saved or imported mapping wins wherever the column actually exists.
+  if (state.wanted){
+    for (const id of MAPPED){
+      const v = state.wanted[id];
+      if (v === undefined) continue;
+      const sel = $('#' + id);
+      if (Array.from(sel.options).some(o => o.value === v)) sel.value = v;
+    }
+  }
+
+  // First table the user loads gets a sensible automatic mapping.
+  if (H.length && (!mappedOnce || !H.includes($('#dateCol').value))){
+    mappedOnce = true;
+    $('#dateCol').value = guess([/^datum$/i, /^date$/i, /datum/i, /date/i, /rooster/i, /dag/i, /day/i], H[0]);
+    const st = guess([/start.?tijd/i, /begin.?tijd/i, /start.?time/i, /^van$/i, /^from$/i, /^start$/i], '');
+    const et = guess([/eind.?tijd/i, /end.?time/i, /^tot$/i, /^to$/i, /^eind$/i, /^end$/i], '');
+    if (st){ $('#startMode').value = 'col'; $('#startCol').value = st; }
+    if (et){ $('#endMode').value = 'col'; $('#endCol').value = et; }
+    const loc = guess([/^loca(tie)?$/i, /locatie/i, /location/i, /adres/i, /address/i, /venue/i, /plaats/i, /waar/i, /host/i, /gastheer/i], '');
+    if (loc && !$('#tplLoc').value) $('#tplLoc').value = '{' + loc + '}';
+    if (!$('#tplTitle').value){
+      const act = guess([/activiteit/i, /activity/i, /onderwerp/i, /subject/i, /^titel$/i, /^title$/i, /^wat$/i, /event/i, /^naam$/i, /^name$/i], '');
+      $('#tplTitle').value = act ? '{' + act + '}' : (loc ? (lang === 'nl' ? 'Afspraak bij {' + loc + '}' : 'Meeting at {' + loc + '}') : '{' + H[0] + '}');
+    }
+    syncTimeInputs();
+  }
+  buildChips();
+}
+function buildChips(){
+  const box = $('#chips');
+  box.innerHTML = '';
+  for (const h of state.headers){
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'chip'; b.textContent = '{' + h + '}';
+    b.addEventListener('mousedown', e => e.preventDefault());
+    b.addEventListener('click', () => insertToken('{' + h + '}'));
+    box.appendChild(b);
+  }
+}
+let lastField = null;
+function insertToken(tok){
+  const el = lastField || $('#tplTitle');
+  const s = el.selectionStart == null ? el.value.length : el.selectionStart;
+  const e = el.selectionEnd == null ? el.value.length : el.selectionEnd;
+  el.value = el.value.slice(0, s) + tok + el.value.slice(e);
+  el.focus();
+  el.setSelectionRange(s + tok.length, s + tok.length);
+  render();
+}
+
+/* ------------------------------------------------------- config + build */
+function fillTemplate(tpl, row){
+  return String(tpl || '').replace(/\{([^{}]+)\}/g, (m, key) => {
+    const k = key.trim();
+    if (Object.prototype.hasOwnProperty.call(row, k)) return row[k];
+    const hit = Object.keys(row).find(h => h.toLowerCase() === k.toLowerCase());
+    return hit ? row[hit] : '';
+  }).replace(/[ \t]+\n/g, '\n').trim();
+}
+function parseBook(text){
+  const map = new Map();
+  for (const line of String(text || '').split(/\r?\n/)){
+    const m = line.match(/^\s*([^=:]+?)\s*[=:]\s*(.+?)\s*$/);
+    if (m) map.set(m[1].toLowerCase(), m[2]);
+  }
+  return map;
+}
+const BYDAY = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
+
+function readConfig(){
+  const freq = $('#freq').value;
+  const byday = $$('#bydayChips .chip[aria-pressed="true"]').map(b => b.dataset.day);
+  return {
+    dateCol: $('#dateCol').value,
+    order: $('#dateOrder').value,
+    endDateCol: $('#endDateCol').value,
+    allDay: $('#allDay').checked,
+    startMode: $('#startMode').value, startTime: $('#startTime').value, startCol: $('#startCol').value,
+    endMode: $('#endMode').value, endTime: $('#endTime').value, endCol: $('#endCol').value,
+    durMin: Math.max(1, parseInt($('#durMin').value, 10) || 60),
+    tplTitle: $('#tplTitle').value, tplLoc: $('#tplLoc').value, tplDesc: $('#tplDesc').value,
+    book: parseBook($('#addressBook').value),
+    skipCol: $('#skipCol').value,
+    freq: freq, interval: Math.max(1, parseInt($('#interval').value, 10) || 1),
+    customUnit: $('#customUnit').value, byday: byday,
+    endRule: $('#endRule').value, count: Math.max(1, parseInt($('#count').value, 10) || 1), until: $('#until').value,
+    calName: $('#calName').value.trim() || 'Calendar',
+    tz: $('#tz').value,
+    orgName: $('#orgName').value.trim(), orgMail: $('#orgMail').value.trim(),
+    alarm: $('#alarm').value, status: $('#status').value, busy: $('#busy').checked
+  };
+}
+
+function buildRRule(cfg, ev){
+  if (cfg.freq === 'none') return '';
+  let freq = cfg.freq, interval = 1, extra = '';
+  if (freq === 'WEEKLY2'){ freq = 'WEEKLY'; interval = 2; }
+  else if (freq === 'MONTHLYNTH'){
+    freq = 'MONTHLY';
+    const dow = new Date(Date.UTC(ev.s.y, ev.s.m - 1, ev.s.d)).getUTCDay();
+    extra = ';BYDAY=' + Math.ceil(ev.s.d / 7) + BYDAY[dow];
+  } else if (freq === 'CUSTOM'){
+    freq = cfg.customUnit; interval = cfg.interval;
+  }
+  if (freq === 'WEEKLY' && cfg.byday.length) extra = ';BYDAY=' + cfg.byday.join(',');
+  let r = 'FREQ=' + freq;
+  if (interval > 1) r += ';INTERVAL=' + interval;
+  r += extra;
+  if (cfg.endRule === 'count') r += ';COUNT=' + cfg.count;
+  else if (cfg.endRule === 'until' && cfg.until){
+    const u = parseDateCell(cfg.until, 'ymd');
+    if (u) r += ';UNTIL=' + (cfg.allDay ? dateStr(u.y, u.m, u.d)
+                                        : stampUTC(zonedToUTC(u.y, u.m, u.d, 23, 59, cfg.tz)));
+  }
+  return r;
+}
+
+function build(){
+  const cfg = readConfig();
+  const problems = [];
+  const events = [];
+  if (!cfg.dateCol || !state.data.length) return { events: events, problems: problems, cfg: cfg };
+
+  let order = cfg.order;
+  if (order === 'auto') order = detectOrder(state.data.map(r => r[cfg.dateCol]));
+
+  const fixedStart = parseTimeCell(cfg.startTime) || { H: 9, M: 0 };
+  const fixedEnd = parseTimeCell(cfg.endTime) || { H: 10, M: 0 };
+  const calId = fnv(cfg.calName.toLowerCase());
+
+  state.data.forEach((row, i) => {
+    if (cfg.skipCol && !String(row[cfg.skipCol] || '').trim()) return;
+
+    const d = parseDateCell(row[cfg.dateCol], order);
+    if (!d){
+      problems.push({ n: i + 1, value: String(row[cfg.dateCol] || '').trim() });
+      return;
+    }
+
+    let s, e;
+    if (cfg.allDay){
+      s = { y: d.y, m: d.m, d: d.d };
+      let endDay = s;
+      if (cfg.endDateCol){
+        const ed = parseDateCell(row[cfg.endDateCol], order);
+        if (ed) endDay = ed;
+      }
+      e = addDays(endDay.y, endDay.m, endDay.d, 1);      // DTEND is exclusive
+    } else {
+      let st = null;
+      if (cfg.startMode === 'col' && cfg.startCol) st = parseTimeCell(row[cfg.startCol]);
+      if (!st) st = d.time || (cfg.startMode === 'col' ? fixedStart : fixedStart);
+      s = { y: d.y, m: d.m, d: d.d, H: st.H, M: st.M };
+
+      let endDay = { y: d.y, m: d.m, d: d.d };
+      if (cfg.endDateCol){
+        const ed = parseDateCell(row[cfg.endDateCol], order);
+        if (ed) endDay = { y: ed.y, m: ed.m, d: ed.d };
+      }
+      let et = null;
+      if (cfg.endMode === 'col' && cfg.endCol) et = parseTimeCell(row[cfg.endCol]);
+      if (!et && cfg.endMode === 'fixed') et = fixedEnd;
+      if (et){
+        e = { y: endDay.y, m: endDay.m, d: endDay.d, H: et.H, M: et.M };
+        // an end at or before the start means it ran past midnight
+        if (endDay.y === s.y && endDay.m === s.m && endDay.d === s.d && (et.H * 60 + et.M) <= (st.H * 60 + st.M)){
+          const nd = addDays(s.y, s.m, s.d, 1);
+          e = { y: nd.y, m: nd.m, d: nd.d, H: et.H, M: et.M };
+        }
+      } else {
+        const total = st.H * 60 + st.M + cfg.durMin;
+        const nd = addDays(endDay.y, endDay.m, endDay.d, Math.floor(total / 1440));
+        e = { y: nd.y, m: nd.m, d: nd.d, H: Math.floor((total % 1440) / 60), M: total % 60 };
+      }
+    }
+
+    let title = fillTemplate(cfg.tplTitle, row);
+    if (!title) title = lang === 'nl' ? '(zonder titel)' : '(untitled)';
+    let loc = fillTemplate(cfg.tplLoc, row);
+    const looked = cfg.book.get(loc.toLowerCase());
+    if (looked) loc = looked;
+    const desc = fillTemplate(cfg.tplDesc, row);
+
+    const ev = { s: s, e: e, title: title, loc: loc, desc: desc, allDay: cfg.allDay };
+    ev.rrule = buildRRule(cfg, ev);
+    ev.uid = 'e' + fnv(calId + '|' + i + '|' + dateStr(s.y, s.m, s.d) + '|' + title) + '-' + calId + '@table-to-calendar';
+    events.push(ev);
+  });
+
+  return { events: events, problems: problems, cfg: cfg };
+}
+
+function serialize(events, cfg){
+  const now = stampUTC(Date.now());
+  const L = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Table to Calendar//EN',
+             'CALSCALE:GREGORIAN', 'METHOD:PUBLISH',
+             'X-WR-CALNAME:' + esc(cfg.calName), 'X-WR-TIMEZONE:' + cfg.tz];
+
+  if (!cfg.allDay && events.length){
+    let y0 = 9999, y1 = 0;
+    for (const e of events){ y0 = Math.min(y0, e.s.y); y1 = Math.max(y1, e.e.y); }
+    if (cfg.freq !== 'none' && cfg.endRule !== 'count') y1 += 5;
+    L.push.apply(L, buildVTimezone(cfg.tz, y0 - 2, y1 + 3));
+  }
+
+  for (const e of events){
+    L.push('BEGIN:VEVENT');
+    L.push('UID:' + e.uid);
+    L.push('DTSTAMP:' + now);
+    if (e.allDay){
+      L.push('DTSTART;VALUE=DATE:' + dateStr(e.s.y, e.s.m, e.s.d));
+      L.push('DTEND;VALUE=DATE:' + dateStr(e.e.y, e.e.m, e.e.d));
+    } else {
+      L.push('DTSTART;TZID=' + cfg.tz + ':' + localStr(e.s.y, e.s.m, e.s.d, e.s.H, e.s.M));
+      L.push('DTEND;TZID=' + cfg.tz + ':' + localStr(e.e.y, e.e.m, e.e.d, e.e.H, e.e.M));
+    }
+    if (e.rrule) L.push('RRULE:' + e.rrule);
+    L.push('SUMMARY:' + esc(e.title));
+    if (e.loc) L.push('LOCATION:' + esc(e.loc));
+    if (e.desc) L.push('DESCRIPTION:' + esc(e.desc));
+    L.push('STATUS:' + cfg.status);
+    L.push('TRANSP:' + (cfg.busy ? 'OPAQUE' : 'TRANSPARENT'));
+    L.push('SEQUENCE:0');
+    if (cfg.orgMail){
+      L.push('ORGANIZER' + (cfg.orgName ? ';CN=' + esc(cfg.orgName) : '') + ':mailto:' + cfg.orgMail);
+    }
+    if (cfg.alarm){
+      L.push('BEGIN:VALARM', 'ACTION:DISPLAY',
+             'DESCRIPTION:' + esc(e.title),
+             'TRIGGER:-PT' + cfg.alarm + 'M', 'END:VALARM');
+    }
+    L.push('END:VEVENT');
+  }
+  L.push('END:VCALENDAR');
+  return L.map(fold).join('\r\n') + '\r\n';
+}
+
+/* ------------------------------------------------------------- render */
+let lastICS = '';
+const WDAY_SHORT = { en: ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'], nl: ['zo','ma','di','wo','do','vr','za'] };
+const MON_SHORT = { en: ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],
+                    nl: ['jan','feb','mrt','apr','mei','jun','jul','aug','sep','okt','nov','dec'] };
+function fmtWhen(e){
+  const wd = new Date(Date.UTC(e.s.y, e.s.m - 1, e.s.d)).getUTCDay();
+  const p = x => String(x).padStart(2, '0');
+  let s = WDAY_SHORT[lang][wd] + ' ' + e.s.d + ' ' + MON_SHORT[lang][e.s.m - 1] + ' ' + e.s.y;
+  if (!e.allDay) s += ' · ' + p(e.s.H) + ':' + p(e.s.M) + '–' + p(e.e.H) + ':' + p(e.e.M);
+  return s;
+}
+// One short line describing the recurrence that every event carries.
+function repeatSummary(cfg){
+  if (cfg.freq === 'none') return '';
+  const f = $('#freq');
+  let s = '↻ ' + f.options[f.selectedIndex].textContent;
+  if (cfg.endRule === 'count') s += ' · ' + cfg.count + '×';
+  else if (cfg.endRule === 'until' && cfg.until) s += ' · → ' + cfg.until;
+  return s;
+}
+
+function render(){
+  const res = build();
+  const { events, problems, cfg } = res;
+  const msgs = $('#messages');
+  msgs.innerHTML = '';
+
+  $('#count-n').textContent = events.length;
+  $('#count-label').textContent = t('p.events');
+
+  if (events.length){
+    const first = events[0], last = events[events.length - 1];
+    $('#rangeLabel').textContent = fmtWhen(first).split(' · ')[0] + '  →  ' + fmtWhen(last).split(' · ')[0];
+  } else $('#rangeLabel').textContent = '';
+
+  const badge = $('#repeatBadge'), rs = repeatSummary(cfg);
+  badge.textContent = rs;
+  badge.hidden = !rs || !events.length;
+
+  if (state.headers.length && !cfg.dateCol) addMsg('warn', t('m.nodate'));
+  if (state.grid.length && !state.headers.length) addMsg('warn', t('m.nocols'));
+  if (problems.length){
+    const show = problems.slice(0, 6).map(p => '<li>' + t('p.row') + ' ' + p.n +
+      (p.value ? ': <span class="mono">' + escapeHTML(p.value.slice(0, 40)) + '</span>' : '') + '</li>').join('');
+    addMsg('warn', problems.length + ' ' + t('m.skipped') + '<ul>' + show +
+      (problems.length > 6 ? '<li>…</li>' : '') + '</ul>');
+  }
+
+  const body = $('#previewBody');
+  body.innerHTML = '';
+  for (const e of events.slice(0, 200)){
+    const tr = document.createElement('tr');
+    tr.innerHTML = '<td class="mono">' + escapeHTML(fmtWhen(e)) + '</td>' +
+                   '<td class="wrap-cell">' + escapeHTML(e.title) + '</td>' +
+                   '<td class="wrap-cell' + (e.loc ? '' : ' muted') + '">' + escapeHTML(e.loc || '—') + '</td>';
+    body.appendChild(tr);
+  }
+  $('#previewWrap').hidden = events.length === 0;
+  $('#previewEmpty').hidden = events.length !== 0;
+
+  lastICS = events.length ? serialize(events, cfg) : '';
+  $('#download').disabled = !events.length;
+  $('#copy').disabled = !events.length;
+  $('#toggleRaw').disabled = !events.length;
+  if (!$('#raw').hidden) $('#raw').textContent = lastICS;
+
+  updateNotes(cfg, events.length);
+  persist();
+}
+function escapeHTML(s){
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+function addMsg(kind, html){
+  const d = document.createElement('div');
+  d.className = 'msg ' + kind;
+  d.innerHTML = html;
+  $('#messages').appendChild(d);
+}
+function updateNotes(cfg, n){
+  $('#note1').textContent = state.data.length
+    ? state.data.length + ' ' + t('p.rows') + ' · ' + state.headers.length + ' ' + t('m.cols')
+    : '';
+  $('#note2').textContent = cfg.dateCol
+    ? cfg.dateCol + (cfg.allDay ? '' : ' · ' + (cfg.startMode === 'col' ? cfg.startCol : cfg.startTime))
+    : '';
+  $('#note3').textContent = cfg.tplTitle || '';
+  const f = $('#freq');
+  $('#note4').textContent = cfg.freq === 'none' ? '' : f.options[f.selectedIndex].textContent;
+  $('#note5').textContent = cfg.calName + ' · ' + cfg.tz;
+}
+
+/* --------------------------------------------------------- persistence */
+const PERSIST = ['headerRow','dateCol','dateOrder','endDateCol','allDay','startMode','startTime','startCol',
+  'endMode','endTime','endCol','durMin','tplTitle','tplLoc','tplDesc','addressBook','skipCol','freq',
+  'interval','customUnit','endRule','count','until','calName','tz','orgName','orgMail','alarm','status','busy','fname'];
+let restoring = false;
+// Column pickers can only take their value once a table with those columns is
+// loaded, so the wanted mapping is kept and re-applied on every table load.
+const MAPPED = ['dateCol', 'endDateCol', 'startCol', 'endCol', 'skipCol'];
+
+function collectSettings(){
+  const o = {};
+  for (const id of PERSIST){
+    const el = document.getElementById(id);
+    if (el) o[id] = el.type === 'checkbox' ? el.checked : el.value;
+  }
+  o.byday = $$('#bydayChips .chip[aria-pressed="true"]').map(b => b.dataset.day);
+  return o;
+}
+function applySettings(o){
+  if (!o || typeof o !== 'object') return false;
+  restoring = true;
+  for (const id of PERSIST){
+    const el = document.getElementById(id);
+    if (!el || o[id] === undefined) continue;
+    if (el.type === 'checkbox') el.checked = !!o[id];
+    else el.value = o[id];
+  }
+  if (Array.isArray(o.byday)){
+    $$('#bydayChips .chip').forEach(b => {
+      const on = o.byday.indexOf(b.dataset.day) >= 0;
+      b.setAttribute('aria-pressed', String(on));
+      paintDay(b);
+    });
+  }
+  state.wanted = {};
+  for (const id of MAPPED) if (o[id] !== undefined) state.wanted[id] = o[id];
+  if (o.tplTitle) mappedOnce = true;
+  if (o.calName) $('#calName').dataset.touched = '1';
+  restoring = false;
+  return true;
+}
+function persist(){
+  if (restoring) return;
+  save('cfg', JSON.stringify(collectSettings()));
+}
+function restore(){
+  let o;
+  try { o = JSON.parse(load('cfg', 'null')); } catch (e) { o = null; }
+  if (o) applySettings(o);
+}
+
+/* ------------------------------------------------- settings file (.json) */
+function settingsFilename(){
+  const base = ($('#calName').value.trim() || 'calendar').toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'calendar';
+  return base + '-setup.json';
+}
+function exportSettings(){
+  return JSON.stringify({
+    app: 'table-to-calendar',
+    version: 1,
+    saved: new Date().toISOString().slice(0, 10),
+    settings: collectSettings()
+  }, null, 2);
+}
+function importSettings(text){
+  let o;
+  try { o = JSON.parse(text); } catch (e) { return false; }
+  if (!o || typeof o !== 'object') return false;
+  // accept both the wrapped file and a bare settings object
+  const cfg = (o.settings && typeof o.settings === 'object') ? o.settings : o;
+  if (!PERSIST.some(id => cfg[id] !== undefined)) return false;
+  return applySettings(cfg);
+}
+function cfgMsg(text, bad){
+  const el = $('#cfgMsg');
+  el.textContent = text;
+  el.style.color = bad ? 'var(--err)' : 'var(--ok)';
+  clearTimeout(cfgMsg._t);
+  cfgMsg._t = setTimeout(() => { el.textContent = ''; }, 2600);
+}
+
+/* ------------------------------------------------------------ wiring */
+function paintDay(b){
+  const on = b.getAttribute('aria-pressed') === 'true';
+  b.style.background = on ? 'var(--accent)' : '';
+  b.style.color = on ? 'var(--on-accent)' : '';
+  b.style.borderColor = on ? 'var(--accent)' : '';
+}
+
+// Handing the viewer a file: the artifact runtime mediates it, a plain page
+// just uses an anchor. Resolved once at start-up; null everywhere else.
+let dlCap = null;
+async function saveFile(name, text, mime){
+  if (dlCap){
+    try { await dlCap.save({ filename: name, data: text }); return true; }
+    catch (e) { if (e && e.code === 'declined') return false; }
+  }
+  const blob = new Blob([text], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+  return true;
+}
+
+function syncTimeInputs(){
+  const allDay = $('#allDay').checked;
+  $('#timeBlock').hidden = allDay;
+  $('#startTime').hidden = $('#startMode').value !== 'fixed';
+  $('#startCol').hidden = $('#startMode').value !== 'col';
+  $('#durWrap').hidden = $('#endMode').value !== 'dur';
+  $('#endTime').hidden = $('#endMode').value !== 'fixed';
+  $('#endCol').hidden = $('#endMode').value !== 'col';
+
+  const f = $('#freq').value;
+  $('#customWrap').hidden = f !== 'CUSTOM';
+  $('#bydayWrap').hidden = !(f === 'WEEKLY' || f === 'WEEKLY2' || (f === 'CUSTOM' && $('#customUnit').value === 'WEEKLY'));
+  $('#endWrap').hidden = f === 'none';
+  $('#count').hidden = $('#endRule').value !== 'count';
+  $('#until').hidden = $('#endRule').value !== 'until';
+}
+
+function loadText(text){
+  state.sheets = [];
+  $('#sheetWrap').hidden = true;
+  const delim = detectDelim(text);
+  setGrid(parseDelimited(text, delim), true);
+}
+function loadWorkbook(data, name){
+  if (typeof XLSX === 'undefined'){ addMsg('err', t('m.noxlsx')); return; }
+  const wb = XLSX.read(data, { type: 'array', cellDates: false, cellNF: true, cellText: true });
+  const d1904 = !!(wb.Workbook && wb.Workbook.WBProps && wb.Workbook.WBProps.date1904);
+  state.sheets = wb.SheetNames.map(n => ({ name: n, grid: sheetToGrid(wb.Sheets[n], d1904) }));
+  const sel = $('#sheet');
+  sel.innerHTML = '';
+  state.sheets.forEach((s, i) => {
+    const o = document.createElement('option');
+    o.value = String(i);
+    o.textContent = s.name + ' (' + s.grid.length + ')';
+    sel.appendChild(o);
+  });
+  const best = 0;                     // the leftmost tab, as Excel opens it
+  sel.value = String(best);
+  $('#sheetWrap').hidden = state.sheets.length < 2;
+  $('#paste').value = '';
+  $('#paste').placeholder = name + ' — ' + state.sheets.length + (lang === 'nl' ? ' tabblad(en)' : ' sheet(s)');
+  $('#paste').dataset.fileNote = '1';
+  setGrid(state.sheets[best].grid, true);
+  if (!$('#calName').dataset.touched) $('#calName').value = name.replace(/\.[^.]+$/, '');
+  syncFilename();
+}
+function loadConfigFile(file){
+  const rd = new FileReader();
+  rd.onerror = () => cfgMsg(t('m.cfgbad'), true);
+  rd.onload = () => {
+    if (importSettings(String(rd.result))){
+      syncTimeInputs(); syncFilename(); refreshSelects(); render();
+      cfgMsg(t('m.cfgloaded'));
+    } else cfgMsg(t('m.cfgbad'), true);
+  };
+  rd.readAsText(file, 'utf-8');
+}
+function handleFile(file){
+  if (!file) return;
+  if (/\.json$/i.test(file.name)){ loadConfigFile(file); return; }
+  const isSheet = /\.(xlsx|xlsm|xls)$/i.test(file.name);
+  const rd = new FileReader();
+  rd.onerror = () => addMsg('err', t('m.badfile'));
+  if (isSheet){
+    rd.onload = () => { try { loadWorkbook(new Uint8Array(rd.result), file.name); } catch (err){ addMsg('err', t('m.badfile') + ' ' + err.message); } };
+    rd.readAsArrayBuffer(file);
+  } else {
+    rd.onload = () => {
+      $('#paste').value = String(rd.result);
+      loadText($('#paste').value);
+      if (!$('#calName').dataset.touched) $('#calName').value = file.name.replace(/\.[^.]+$/, '');
+      syncFilename();
+    };
+    rd.readAsText(file, 'utf-8');
+  }
+}
+function syncFilename(){
+  const base = ($('#calName').value.trim() || 'calendar').toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'calendar';
+  $('#fname').value = base + '.ics';
+}
+
+const EXAMPLE = [
+  'Date\tHost\tLeader\tSnacks',
+  '25-08-2026\tJohn Doe\tJane Doe\tRichard Roe',
+  '08-09-2026\tJane Doe\tRichard Roe\tJohn Doe',
+  '22-09-2026\tRichard Roe\tJohn Doe\tJane Doe',
+  '06-10-2026\tJohn Doe\tJane Doe\tRichard Roe',
+  '20-10-2026\tJane Doe\tRichard Roe\tJohn Doe',
+  '03-11-2026\tRichard Roe\tJohn Doe\tJane Doe'
+].join('\n');
+
+function init(){
+  captureEN();
+
+  /* time zones */
+  const tzSel = $('#tz');
+  let zones = [];
+  try { zones = Intl.supportedValuesOf('timeZone'); } catch (e) {}
+  if (!zones || !zones.length){
+    zones = ['Europe/Amsterdam','Europe/Brussels','Europe/Berlin','Europe/Paris','Europe/London','Europe/Madrid',
+             'Europe/Rome','Europe/Zurich','Europe/Stockholm','Europe/Warsaw','Europe/Lisbon','Europe/Athens',
+             'UTC','America/New_York','America/Chicago','America/Denver','America/Los_Angeles','America/Sao_Paulo',
+             'Asia/Dubai','Asia/Kolkata','Asia/Singapore','Asia/Tokyo','Asia/Shanghai','Australia/Sydney'];
+  }
+  let localTz = 'Europe/Amsterdam';
+  try { localTz = Intl.DateTimeFormat().resolvedOptions().timeZone || localTz; } catch (e) {}
+  if (zones.indexOf(localTz) < 0) zones = [localTz].concat(zones);
+  for (const z of zones){
+    const o = document.createElement('option');
+    o.value = z; o.textContent = z;
+    tzSel.appendChild(o);
+  }
+  tzSel.value = localTz;
+
+  /* weekday chips */
+  const order = [1, 2, 3, 4, 5, 6, 0];
+  const box = $('#bydayChips');
+  for (const i of order){
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'chip'; b.dataset.day = BYDAY[i];
+    b.setAttribute('aria-pressed', 'false');
+    b.addEventListener('click', () => {
+      b.setAttribute('aria-pressed', b.getAttribute('aria-pressed') === 'true' ? 'false' : 'true');
+      paintDay(b);
+      render();
+    });
+    box.appendChild(b);
+  }
+  function labelDays(){
+    $$('#bydayChips .chip').forEach(b => { b.textContent = WDAY_SHORT[lang][BYDAY.indexOf(b.dataset.day)]; });
+  }
+  labelDays();
+
+  /* theme */
+  const savedTheme = load('theme', '');
+  if (savedTheme) document.documentElement.setAttribute('data-theme', savedTheme);
+  $('#themeBtn').addEventListener('click', () => {
+    const cur = document.documentElement.getAttribute('data-theme');
+    const next = cur === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
+    save('theme', next);
+  });
+
+  /* language */
+  lang = load('lang', (navigator.language || 'en').toLowerCase().startsWith('nl') ? 'nl' : 'en');
+  $('#langEn').addEventListener('click', () => { lang = 'en'; save('lang', lang); labelDays(); refreshSelects(); applyLang(); });
+  $('#langNl').addEventListener('click', () => { lang = 'nl'; save('lang', lang); labelDays(); refreshSelects(); applyLang(); });
+
+  /* input */
+  const paste = $('#paste');
+  paste.addEventListener('input', () => { loadText(paste.value); });
+  $('#headerRow').addEventListener('input', rebuildColumns);
+  $('#sheet').addEventListener('change', () => {
+    const s = state.sheets[parseInt($('#sheet').value, 10)];
+    if (s) setGrid(s.grid, true);
+  });
+  $('#fileBtn').addEventListener('click', () => $('#file').click());
+  $('#file').addEventListener('change', e => handleFile(e.target.files[0]));
+  $('#clearBtn').addEventListener('click', () => {
+    paste.value = ''; state.sheets = []; $('#sheetWrap').hidden = true;
+    paste.placeholder = lang === 'nl' && NL['s1.ph'] ? NL['s1.ph'] : EN['ph:s1.ph'];
+    setGrid([]);
+  });
+  $('#exampleBtn').addEventListener('click', () => {
+    paste.value = EXAMPLE;
+    mappedOnce = false;
+    loadText(EXAMPLE);
+    $('#tplTitle').value = lang === 'nl' ? 'Afspraak bij {Host}' : 'Meeting at {Host}';
+    $('#tplDesc').value = (lang === 'nl' ? 'Gastheer: {Host}\nLeider: {Leader}\nHapjes: {Snacks}'
+                                         : 'Host: {Host}\nLeader: {Leader}\nSnacks: {Snacks}');
+    $('#tplLoc').value = '{Host}';
+    render();
+  });
+
+  const drop = $('#drop');
+  ['dragenter', 'dragover'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('over'); }));
+  ['dragleave', 'drop'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove('over'); }));
+  drop.addEventListener('drop', e => { if (e.dataTransfer.files && e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]); });
+
+  /* template fields remember focus so chips insert in the right place */
+  $$('.tpl').forEach(el => el.addEventListener('focus', () => { lastField = el; }));
+  lastField = $('#tplTitle');
+
+  /* re-render on any change */
+  $$('input, select, textarea').forEach(el => {
+    if (el.id === 'paste' || el.id === 'headerRow' || el.id === 'file' || el.id === 'sheet') return;
+    el.addEventListener('input', () => { syncTimeInputs(); render(); });
+    el.addEventListener('change', () => { syncTimeInputs(); render(); });
+  });
+  $('#calName').addEventListener('input', function(){ this.dataset.touched = '1'; syncFilename(); });
+
+  /* output */
+  $('#download').addEventListener('click', () => {
+    const name = ($('#fname').value.trim() || 'calendar.ics').replace(/(\.ics)?$/i, '.ics');
+    saveFile(name, lastICS, 'text/calendar;charset=utf-8');
+  });
+
+  /* settings file */
+  $('#cfgSave').addEventListener('click', async () => {
+    const okSaved = await saveFile(settingsFilename(), exportSettings(), 'application/json');
+    if (okSaved) cfgMsg(t('m.cfgsaved'));
+  });
+  $('#cfgLoad').addEventListener('click', () => $('#cfgFile').click());
+  $('#cfgFile').addEventListener('change', e => {
+    const f = e.target.files[0];
+    if (f) loadConfigFile(f);
+    e.target.value = '';
+  });
+  $('#copy').addEventListener('click', async () => {
+    const btn = $('#copy'), old = btn.textContent;
+    try { await navigator.clipboard.writeText(lastICS); btn.textContent = t('m.copied'); }
+    catch (e) { btn.textContent = '⌘C'; }
+    setTimeout(() => { btn.textContent = old; }, 1400);
+  });
+  $('#toggleRaw').addEventListener('click', () => {
+    const pre = $('#raw');
+    pre.hidden = !pre.hidden;
+    pre.textContent = lastICS;
+    $('#toggleRaw').textContent = pre.hidden ? t('p.showraw') : t('p.hideraw');
+  });
+
+  function adaptToSandbox(){
+    if (!(window.claude && typeof window.claude.use === 'function')) return false;
+    window.claude.use('downloads').then(ns => { dlCap = ns || null; }, () => {});
+    $('#download').hidden = true;
+    $('#copy').classList.add('primary');
+    $('#sandboxNote').hidden = false;
+    return true;
+  }
+  if (!adaptToSandbox()) setTimeout(adaptToSandbox, 1500);
+
+  restore();
+  applyLang();
+  syncTimeInputs();
+  syncFilename();
+  if (paste.value.trim()) loadText(paste.value); else render();
+}
+
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+else init();
+</script>
+</body>
+</html>
